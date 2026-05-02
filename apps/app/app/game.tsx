@@ -5,6 +5,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -45,6 +46,7 @@ export default function GameScreen() {
   const [board, setBoard] = useState<(Tile | null)[]>(() => makeBoard());
   const [tray, setTray] = useState<Tile[]>([]);
   const [score, setScore] = useState(0);
+  const [boardGen, setBoardGen] = useState(0);
 
   const remaining = useMemo(() => board.filter(Boolean).length, [board]);
 
@@ -94,6 +96,7 @@ export default function GameScreen() {
     setBoard(makeBoard());
     setTray([]);
     setScore(0);
+    setBoardGen((g) => g + 1);
   }, []);
 
   const onTile = useCallback(
@@ -235,22 +238,29 @@ export default function GameScreen() {
 
         {/* Board */}
         <View style={[styles.board, { width: boardWidth }]}>
-          {board.map((tile, idx) => (
-            <Pressable
-              key={idx}
-              onPress={() => onTile(idx)}
-              style={[
-                styles.tile,
-                {
-                  width: tileSize,
-                  height: tileSize,
-                  opacity: tile ? 1 : 0,
-                },
-              ]}
-              disabled={!tile}>
-              {tile ? <Text style={{ fontSize: tileSize * 0.55 }}>{tile.icon}</Text> : null}
-            </Pressable>
-          ))}
+          {board.map((tile, idx) => {
+            const row = Math.floor(idx / COLS);
+            const col = idx % COLS;
+            return (
+              <Animated.View
+                key={`${boardGen}-${idx}`}
+                entering={FadeInDown.duration(420).delay(row * 60 + col * 18)}>
+                <Pressable
+                  onPress={() => onTile(idx)}
+                  style={[
+                    styles.tile,
+                    {
+                      width: tileSize,
+                      height: tileSize,
+                      opacity: tile ? 1 : 0,
+                    },
+                  ]}
+                  disabled={!tile}>
+                  {tile ? <Text style={{ fontSize: tileSize * 0.55 }}>{tile.icon}</Text> : null}
+                </Pressable>
+              </Animated.View>
+            );
+          })}
         </View>
 
         <View style={{ flex: 1 }} />
