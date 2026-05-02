@@ -4,7 +4,14 @@ import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const SLIDE_DURATION = 320;
 
 const ICONS = [
   '🌳', '🍇', '🥦', '🍉', '🍋', '🍌',
@@ -170,6 +177,22 @@ export default function GameScreen() {
   const boardWidth = Math.min(width - 24, 480);
   const tileSize = Math.floor(boardWidth / COLS) - 4;
 
+  // Slide top clusters in from off-screen on mount.
+  const leftX = useSharedValue(-220);
+  const rightX = useSharedValue(220);
+  useEffect(() => {
+    leftX.value = withTiming(0, { duration: SLIDE_DURATION });
+    rightX.value = withTiming(0, { duration: SLIDE_DURATION });
+  }, [leftX, rightX]);
+  const leftStyle = useAnimatedStyle(() => ({ transform: [{ translateX: leftX.value }] }));
+  const rightStyle = useAnimatedStyle(() => ({ transform: [{ translateX: rightX.value }] }));
+
+  const goBack = useCallback(() => {
+    leftX.value = withTiming(-220, { duration: SLIDE_DURATION });
+    rightX.value = withTiming(220, { duration: SLIDE_DURATION });
+    setTimeout(() => router.back(), SLIDE_DURATION - 60);
+  }, [router, leftX, rightX]);
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -183,16 +206,16 @@ export default function GameScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {/* Top bar */}
         <View style={styles.topBar}>
-          <View style={styles.topGroup}>
-            <CircleButton onPress={() => router.back()}>
+          <Animated.View style={[styles.topGroup, leftStyle]}>
+            <CircleButton onPress={goBack}>
               <Ionicons name="arrow-back" size={20} color="#fff" />
             </CircleButton>
             <CircleButton onPress={restart}>
               <Ionicons name="refresh" size={20} color="#fff" />
             </CircleButton>
-          </View>
+          </Animated.View>
           <Text style={styles.levelTitle}>Level 2</Text>
-          <View style={styles.topGroup}>
+          <Animated.View style={[styles.topGroup, rightStyle]}>
             <View style={styles.coinPill}>
               <View style={styles.coin}>
                 <Text style={styles.coinGlyph}>$</Text>
@@ -202,7 +225,7 @@ export default function GameScreen() {
             <CircleButton>
               <Ionicons name="cart" size={20} color="#fff" />
             </CircleButton>
-          </View>
+          </Animated.View>
         </View>
 
         <View style={styles.scoreRow}>

@@ -1,11 +1,38 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const SLIDE_DURATION = 320;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const leftX = useSharedValue(0);
+  const rightX = useSharedValue(0);
+
+  // Slide top clusters back into place whenever home regains focus.
+  useFocusEffect(
+    useCallback(() => {
+      leftX.value = withTiming(0, { duration: SLIDE_DURATION });
+      rightX.value = withTiming(0, { duration: SLIDE_DURATION });
+    }, [leftX, rightX]),
+  );
+
+  const leftStyle = useAnimatedStyle(() => ({ transform: [{ translateX: leftX.value }] }));
+  const rightStyle = useAnimatedStyle(() => ({ transform: [{ translateX: rightX.value }] }));
+
+  const handlePlay = useCallback(() => {
+    leftX.value = withTiming(-220, { duration: SLIDE_DURATION });
+    rightX.value = withTiming(220, { duration: SLIDE_DURATION });
+    setTimeout(() => router.push('/game'), SLIDE_DURATION - 60);
+  }, [router, leftX, rightX]);
 
   return (
     <View style={styles.root}>
@@ -18,15 +45,15 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {/* Top bar */}
         <View style={styles.topBar}>
-          <View style={styles.topLeft}>
+          <Animated.View style={[styles.topLeft, leftStyle]}>
             <CircleButton>
               <Ionicons name="settings-sharp" size={20} color="#fff" />
             </CircleButton>
             <CircleButton>
               <Ionicons name="cube" size={20} color="#fff" />
             </CircleButton>
-          </View>
-          <View style={styles.topRight}>
+          </Animated.View>
+          <Animated.View style={[styles.topRight, rightStyle]}>
             <View style={styles.coinPill}>
               <View style={styles.coin}>
                 <Text style={styles.coinGlyph}>$</Text>
@@ -39,7 +66,7 @@ export default function HomeScreen() {
             <CircleButton>
               <Ionicons name="cart" size={20} color="#fff" />
             </CircleButton>
-          </View>
+          </Animated.View>
         </View>
 
         {/* Logo */}
@@ -57,7 +84,7 @@ export default function HomeScreen() {
             <Ionicons name="person" size={22} color="#fff" />
           </View>
           <Pressable
-            onPress={() => router.push('/game')}
+            onPress={handlePlay}
             style={({ pressed }) => [styles.levelBtn, pressed && { transform: [{ scale: 0.97 }] }]}>
             <View style={styles.levelBtnInner}>
               <Text style={styles.levelText}>Level 2</Text>
