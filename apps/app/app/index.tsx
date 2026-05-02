@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SettingsModal } from '@/components/settings-modal';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -14,6 +15,7 @@ const SLIDE_DURATION = 320;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const leftX = useSharedValue(0);
   const rightX = useSharedValue(0);
 
@@ -46,7 +48,7 @@ export default function HomeScreen() {
         {/* Top bar */}
         <View style={styles.topBar}>
           <Animated.View style={[styles.topLeft, leftStyle]}>
-            <CircleButton>
+            <CircleButton onPress={() => setSettingsOpen(true)}>
               <Ionicons name="settings-sharp" size={20} color="#fff" />
             </CircleButton>
             <CircleButton>
@@ -92,12 +94,18 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       </SafeAreaView>
+
+      <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </View>
   );
 }
 
-function CircleButton({ children }: { children: React.ReactNode }) {
-  return <View style={styles.circleBtn}>{children}</View>;
+function CircleButton({ children, onPress }: { children: React.ReactNode; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.circleBtn}>
+      {children}
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
