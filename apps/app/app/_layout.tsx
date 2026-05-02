@@ -13,6 +13,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ animation: 'fade' }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="game" options={{ headerShown: false }} />
+        <Stack.Screen name="map" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', animation: 'slide_from_bottom' }} />
       </Stack>
       <StatusBar style="auto" />

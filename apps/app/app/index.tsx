@@ -51,8 +51,8 @@ export default function HomeScreen() {
             <CircleButton onPress={() => setSettingsOpen(true)}>
               <Ionicons name="settings-sharp" size={20} color="#fff" />
             </CircleButton>
-            <CircleButton>
-              <Ionicons name="cube" size={20} color="#fff" />
+            <CircleButton onPress={() => router.push('/map')}>
+              <Ionicons name="map" size={20} color="#fff" />
             </CircleButton>
           </Animated.View>
           <Animated.View style={[styles.topRight, rightStyle]}>
