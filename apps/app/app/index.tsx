@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,31 +9,11 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Layered scenic background */}
-      <View style={[styles.layer, styles.sky]} />
-      <View style={[styles.layer, styles.skyMid]} />
-      <View style={[styles.layer, styles.skyHaze]} />
-
-      {/* Distant mountains */}
-      <View style={[styles.mountain, styles.mountainBackLeft]} />
-      <View style={[styles.mountain, styles.mountainBackRight]} />
-      {/* Foreground snow-capped peaks */}
-      <View style={[styles.mountain, styles.mountainFrontLeft]}>
-        <View style={styles.snowCap} />
-      </View>
-      <View style={[styles.mountain, styles.mountainFrontRight]}>
-        <View style={styles.snowCap} />
-      </View>
-
-      {/* Lavender field */}
-      <View style={styles.field} />
-      <View style={styles.fieldFront} />
-
-      {/* Tiny house */}
-      <View style={styles.house}>
-        <View style={styles.houseRoof} />
-        <View style={styles.houseBody} />
-      </View>
+      <Image
+        source={require('@/assets/images/bg.png')}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+      />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {/* Top bar */}
@@ -98,93 +79,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#a8d4ee',
     overflow: 'hidden',
   },
-  layer: { position: 'absolute', left: 0, right: 0 },
-  sky: { top: 0, height: '55%', backgroundColor: '#9ed1ee' },
-  skyMid: { top: '25%', height: '20%', backgroundColor: '#bfe1f1' },
-  skyHaze: { top: '40%', height: '15%', backgroundColor: '#d6e9ee' },
-
-  mountain: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    transform: [{ rotate: '45deg' }],
-  },
-  mountainBackLeft: {
-    backgroundColor: '#6f8aa3',
-    top: '32%',
-    left: -180,
-  },
-  mountainBackRight: {
-    backgroundColor: '#7d97ad',
-    top: '30%',
-    right: -160,
-  },
-  mountainFrontLeft: {
-    backgroundColor: '#5a7795',
-    top: '38%',
-    left: -100,
-    width: 280,
-    height: 280,
-    alignItems: 'center',
-  },
-  mountainFrontRight: {
-    backgroundColor: '#506e8c',
-    top: '36%',
-    right: -90,
-    width: 300,
-    height: 300,
-    alignItems: 'center',
-  },
-  snowCap: {
-    position: 'absolute',
-    top: 10,
-    width: 90,
-    height: 90,
-    backgroundColor: '#f4f8fb',
-    transform: [{ rotate: '0deg' }],
-    borderRadius: 6,
-  },
-
-  field: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '38%',
-    backgroundColor: '#9b7fc4',
-  },
-  fieldFront: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '22%',
-    backgroundColor: '#7c5fae',
-  },
-
-  house: {
-    position: 'absolute',
-    right: 36,
-    bottom: '38%',
-    width: 36,
-    alignItems: 'center',
-  },
-  houseRoof: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 18,
-    borderRightWidth: 18,
-    borderBottomWidth: 14,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#c45a3e',
-  },
-  houseBody: {
-    width: 28,
-    height: 22,
-    backgroundColor: '#f4ead8',
-  },
-
   safe: { flex: 1, paddingHorizontal: 16 },
 
   topBar: {

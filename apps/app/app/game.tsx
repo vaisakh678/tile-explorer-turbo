@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -173,9 +174,11 @@ export default function GameScreen() {
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Background bands */}
-      <View style={[styles.bgLayer, styles.sky]} />
-      <View style={[styles.bgLayer, styles.field]} />
+      <Image
+        source={require('@/assets/images/bg.png')}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+      />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {/* Top bar */}
@@ -276,10 +279,6 @@ function PowerButton({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#cfe6f4' },
-
-  bgLayer: { position: 'absolute', left: 0, right: 0 },
-  sky: { top: 0, height: '60%', backgroundColor: '#cfe6f4' },
-  field: { bottom: 0, height: '40%', backgroundColor: '#9b7fc4' },
 
   safe: { flex: 1, paddingHorizontal: 12 },
 
