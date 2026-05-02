@@ -1,156 +1,410 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+const ICONS = [
+  '🌳', '🍇', '🥦', '🍉', '🍋', '🍌',
+  '🍒', '🍎', '🍓', '🥕', '🌽', '🍑',
+  '🥝', '🍍', '🥥', '🍆', '🥑', '🍐',
+];
+const COLS = 6;
+const ROWS = 9; // 54 tiles = 18 icons × 3
+const TRAY_SIZE = 7;
 
-const ROWS = 10;
-const COLS = 8;
-const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-type Cell = number | null;
+type Tile = { id: number; icon: string };
 
-function makeBoard(): Cell[][] {
-  return Array.from({ length: ROWS }, () =>
-    Array.from({ length: COLS }, () => Math.floor(Math.random() * COLORS.length)),
-  );
-}
-
-function findGroup(board: Cell[][], r: number, c: number): [number, number][] {
-  const target = board[r][c];
-  if (target === null) return [];
-  const seen = new Set<string>();
-  const stack: [number, number][] = [[r, c]];
-  const group: [number, number][] = [];
-  while (stack.length) {
-    const [cr, cc] = stack.pop()!;
-    const key = `${cr},${cc}`;
-    if (seen.has(key)) continue;
-    if (cr < 0 || cr >= ROWS || cc < 0 || cc >= COLS) continue;
-    if (board[cr][cc] !== target) continue;
-    seen.add(key);
-    group.push([cr, cc]);
-    stack.push([cr + 1, cc], [cr - 1, cc], [cr, cc + 1], [cr, cc - 1]);
+function makeBoard(): Tile[] {
+  const tiles: Tile[] = [];
+  let id = 0;
+  for (const icon of ICONS) {
+    for (let i = 0; i < 3; i++) tiles.push({ id: id++, icon });
   }
-  return group;
-}
-
-function collapse(board: Cell[][]): Cell[][] {
-  const cols: Cell[][] = [];
-  for (let c = 0; c < COLS; c++) {
-    const stack: Cell[] = [];
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (board[r][c] !== null) stack.push(board[r][c]);
-    }
-    while (stack.length < ROWS) stack.push(null);
-    cols.push(stack);
+  // Fisher-Yates shuffle
+  for (let i = tiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
   }
-  const filled = cols.filter((col) => col.some((v) => v !== null));
-  while (filled.length < COLS) filled.push(Array(ROWS).fill(null));
-  const next: Cell[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-  for (let c = 0; c < COLS; c++) {
-    for (let r = 0; r < ROWS; r++) {
-      next[ROWS - 1 - r][c] = filled[c][r];
-    }
-  }
-  return next;
-}
-
-function hasMoves(board: Cell[][]): boolean {
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const v = board[r][c];
-      if (v === null) continue;
-      if (r + 1 < ROWS && board[r + 1][c] === v) return true;
-      if (c + 1 < COLS && board[r][c + 1] === v) return true;
-    }
-  }
-  return false;
+  return tiles;
 }
 
 export default function GameScreen() {
-  const [board, setBoard] = useState<Cell[][]>(() => makeBoard());
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+
+  const [board, setBoard] = useState<(Tile | null)[]>(() => makeBoard());
+  const [tray, setTray] = useState<Tile[]>([]);
   const [score, setScore] = useState(0);
 
-  const { width } = useWindowDimensions();
-  const tileSize = Math.floor(Math.min(width - 32, 480) / COLS);
-  const gameOver = useMemo(() => !hasMoves(board), [board]);
+  const remaining = useMemo(() => board.filter(Boolean).length, [board]);
 
-  const onTile = useCallback(
-    (r: number, c: number) => {
-      const group = findGroup(board, r, c);
-      if (group.length < 2) return;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const next = board.map((row) => row.slice());
-      for (const [gr, gc] of group) next[gr][gc] = null;
-      setBoard(collapse(next));
-      setScore((s) => s + group.length * (group.length - 1));
-    },
-    [board],
-  );
+  // Auto-resolve triples in tray.
+  useEffect(() => {
+    const counts = new Map<string, Tile[]>();
+    for (const t of tray) {
+      const list = counts.get(t.icon) ?? [];
+      list.push(t);
+      counts.set(t.icon, list);
+    }
+    for (const [, list] of counts) {
+      if (list.length >= 3) {
+        const ids = new Set(list.slice(0, 3).map((t) => t.id));
+        setTimeout(() => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setTray((cur) => cur.filter((t) => !ids.has(t.id)));
+          setScore((s) => s + 30);
+        }, 250);
+        return;
+      }
+    }
+    if (tray.length >= TRAY_SIZE) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setTimeout(() => {
+        Alert.alert('Tray full!', 'No room left for new tiles.', [
+          { text: 'Restart', onPress: restart },
+          { text: 'Quit', onPress: () => router.back(), style: 'cancel' },
+        ]);
+      }, 100);
+    }
+  }, [tray]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reset = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  // Win check.
+  useEffect(() => {
+    if (remaining === 0 && tray.length === 0) {
+      setTimeout(() => {
+        Alert.alert('Level Complete!', `Score: ${score}`, [
+          { text: 'Play Again', onPress: restart },
+          { text: 'Home', onPress: () => router.back(), style: 'cancel' },
+        ]);
+      }, 300);
+    }
+  }, [remaining, tray.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const restart = useCallback(() => {
     setBoard(makeBoard());
+    setTray([]);
     setScore(0);
   }, []);
 
-  return (
-    <ThemedView style={styles.screen}>
-      <Stack.Screen options={{ title: 'Level 2' }} />
-      <View style={styles.header}>
-        <ThemedText type="title">Tile Pop</ThemedText>
-        <ThemedText type="subtitle">Score: {score}</ThemedText>
-      </View>
+  const onTile = useCallback(
+    (idx: number) => {
+      const tile = board[idx];
+      if (!tile) return;
+      if (tray.length >= TRAY_SIZE) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setBoard((cur) => {
+        const next = cur.slice();
+        next[idx] = null;
+        return next;
+      });
+      setTray((cur) => [...cur, tile]);
+    },
+    [board, tray.length],
+  );
 
-      <View style={[styles.board, { width: tileSize * COLS, height: tileSize * ROWS }]}>
-        {board.map((row, r) =>
-          row.map((cell, c) => (
+  // Power-ups
+  const undo = useCallback(() => {
+    if (tray.length === 0) return;
+    const last = tray[tray.length - 1];
+    const slot = board.findIndex((t) => t === null);
+    if (slot < 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTray((cur) => cur.slice(0, -1));
+    setBoard((cur) => {
+      const next = cur.slice();
+      next[slot] = last;
+      return next;
+    });
+  }, [tray, board]);
+
+  const shuffle = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setBoard((cur) => {
+      const tiles = cur.filter(Boolean) as Tile[];
+      for (let i = tiles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+      }
+      const next: (Tile | null)[] = Array(cur.length).fill(null);
+      let k = 0;
+      for (let i = 0; i < cur.length; i++) {
+        if (cur[i] !== null) next[i] = tiles[k++];
+      }
+      return next;
+    });
+  }, []);
+
+  const hint = useCallback(() => {
+    // Send up to 3 of the most-frequent on-board icon to tray to clear a triple.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const counts = new Map<string, number[]>();
+    board.forEach((t, i) => {
+      if (!t) return;
+      const arr = counts.get(t.icon) ?? [];
+      arr.push(i);
+      counts.set(t.icon, arr);
+    });
+    let pickIdxs: number[] | null = null;
+    for (const [, idxs] of counts) {
+      if (idxs.length >= 3 && tray.length + 3 <= TRAY_SIZE) {
+        pickIdxs = idxs.slice(0, 3);
+        break;
+      }
+    }
+    if (!pickIdxs) return;
+    setBoard((cur) => {
+      const next = cur.slice();
+      const taken: Tile[] = [];
+      for (const i of pickIdxs!) {
+        if (next[i]) taken.push(next[i]!);
+        next[i] = null;
+      }
+      setTray((tcur) => [...tcur, ...taken]);
+      return next;
+    });
+  }, [board, tray.length]);
+
+  const boardWidth = Math.min(width - 24, 480);
+  const tileSize = Math.floor(boardWidth / COLS) - 4;
+
+  return (
+    <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Background bands */}
+      <View style={[styles.bgLayer, styles.sky]} />
+      <View style={[styles.bgLayer, styles.field]} />
+
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <View style={styles.topGroup}>
+            <CircleButton onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={20} color="#fff" />
+            </CircleButton>
+            <CircleButton onPress={restart}>
+              <Ionicons name="refresh" size={20} color="#fff" />
+            </CircleButton>
+          </View>
+          <Text style={styles.levelTitle}>Level 2</Text>
+          <View style={styles.topGroup}>
+            <View style={styles.coinPill}>
+              <View style={styles.coin}>
+                <Text style={styles.coinGlyph}>$</Text>
+              </View>
+              <Text style={styles.coinText}>{350 + score}</Text>
+            </View>
+            <CircleButton>
+              <Ionicons name="cart" size={20} color="#fff" />
+            </CircleButton>
+          </View>
+        </View>
+
+        <View style={styles.scoreRow}>
+          <Text style={styles.scoreText}>Tiles left: {remaining}</Text>
+          <Text style={styles.scoreText}>Score: {score}</Text>
+        </View>
+
+        {/* Board */}
+        <View style={[styles.board, { width: boardWidth }]}>
+          {board.map((tile, idx) => (
             <Pressable
-              key={`${r}-${c}`}
-              onPress={() => onTile(r, c)}
+              key={idx}
+              onPress={() => onTile(idx)}
               style={[
                 styles.tile,
                 {
                   width: tileSize,
                   height: tileSize,
-                  left: c * tileSize,
-                  top: r * tileSize,
-                  backgroundColor: cell === null ? 'transparent' : COLORS[cell],
+                  opacity: tile ? 1 : 0,
                 },
               ]}
-            />
-          )),
-        )}
-      </View>
+              disabled={!tile}>
+              {tile ? <Text style={{ fontSize: tileSize * 0.55 }}>{tile.icon}</Text> : null}
+            </Pressable>
+          ))}
+        </View>
 
-      <Pressable onPress={reset} style={styles.button}>
-        <ThemedText type="defaultSemiBold">{gameOver ? 'Game Over — New Game' : 'New Game'}</ThemedText>
-      </Pressable>
-    </ThemedView>
+        <View style={{ flex: 1 }} />
+
+        {/* Tray */}
+        <View style={styles.tray}>
+          {Array.from({ length: TRAY_SIZE }).map((_, i) => {
+            const t = tray[i];
+            return (
+              <View key={i} style={styles.traySlot}>
+                {t ? <Text style={styles.trayIcon}>{t.icon}</Text> : null}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Power-ups */}
+        <View style={styles.powerRow}>
+          <PowerButton icon="arrow-undo" onPress={undo} />
+          <PowerButton icon="shuffle" onPress={shuffle} />
+          <PowerButton icon="bulb" onPress={hint} />
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+function CircleButton({ children, onPress }: { children: React.ReactNode; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.circleBtn}>
+      {children}
+    </Pressable>
+  );
+}
+
+function PowerButton({
+  icon,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.powerBtn}>
+      <Ionicons name={icon} size={26} color="#fff" />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', paddingTop: 64, gap: 16 },
-  header: { alignItems: 'center', gap: 4 },
+  root: { flex: 1, backgroundColor: '#cfe6f4' },
+
+  bgLayer: { position: 'absolute', left: 0, right: 0 },
+  sky: { top: 0, height: '60%', backgroundColor: '#cfe6f4' },
+  field: { bottom: 0, height: '40%', backgroundColor: '#9b7fc4' },
+
+  safe: { flex: 1, paddingHorizontal: 12 },
+
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 8,
+  },
+  topGroup: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  levelTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 2,
+  },
+
+  circleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+
+  coinPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 18,
+    paddingLeft: 4,
+    paddingRight: 10,
+    height: 32,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    gap: 6,
+  },
+  coin: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#f5c542',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coinGlyph: { color: '#a07717', fontWeight: '900', fontSize: 12 },
+  coinText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+
+  scoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  scoreText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
   board: {
-    position: 'relative',
-    backgroundColor: '#00000010',
-    borderRadius: 8,
-    overflow: 'hidden',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 6,
+    gap: 4,
   },
   tile: {
-    position: 'absolute',
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#00000020',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
   },
-  button: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+
+  tray: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: 16,
+    padding: 6,
+    gap: 4,
+    alignSelf: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  traySlot: {
+    width: 38,
+    height: 44,
     borderRadius: 8,
-    backgroundColor: '#00000015',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trayIcon: { fontSize: 24 },
+
+  powerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 30,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  powerBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#7c5fae',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
 });
